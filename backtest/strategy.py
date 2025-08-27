@@ -223,6 +223,9 @@ class Strategy(ABC):
         volatility = np.std(returns) * np.sqrt(252) * 100  # 年化波动率
         sharpe_ratio = annual_return / volatility if volatility != 0 else 0
         
+        # 索提诺比率
+        sortino_ratio = self._calculate_sortino_ratio(returns, annual_return)
+        
         # 最大回撤
         peak = np.maximum.accumulate(self.equity_curve)
         drawdown = (self.equity_curve - peak) / peak * 100
@@ -235,6 +238,7 @@ class Strategy(ABC):
             'annual_return': annual_return,
             'volatility': volatility,
             'sharpe_ratio': sharpe_ratio,
+            'sortino_ratio': sortino_ratio,
             'max_drawdown': max_drawdown,
             'total_trades': len(self.trades),
             'win_rate': self._calculate_win_rate(),
@@ -264,6 +268,37 @@ class Strategy(ABC):
                               (trade['side'] == 'short' and trade['price'] > 0)))
         
         return gross_profit / gross_loss if gross_loss != 0 else float('inf')
+    
+    def _calculate_sortino_ratio(self, returns: np.ndarray, annual_return: float) -> float:
+        """计算索提诺比率
+        
+        Args:
+            returns: 日收益率数组
+            annual_return: 年化收益率
+            
+        Returns:
+            索提诺比率
+        """
+        if len(returns) == 0:
+            return 0.0
+        
+        # 计算下行偏差（只考虑负收益）
+        downside_returns = returns[returns < 0]
+        
+        if len(downside_returns) == 0:
+            # 如果没有下行风险，索提诺比率为无穷大
+            return float('inf')
+        
+        # 计算年化下行偏差
+        downside_deviation = np.std(downside_returns) * np.sqrt(252) * 100
+        
+        # 计算索提诺比率
+        if downside_deviation != 0:
+            sortino_ratio = annual_return / downside_deviation
+        else:
+            sortino_ratio = float('inf')
+        
+        return sortino_ratio
     
     def get_positions_summary(self) -> Dict[str, Any]:
         """获取持仓摘要"""
